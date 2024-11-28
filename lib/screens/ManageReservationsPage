@@ -1,0 +1,94 @@
+import 'package:flutter/material.dart';
+import '../services/DriverService.dart';
+
+class ManageReservationsPage extends StatefulWidget {
+  final int driveId;
+
+  const ManageReservationsPage({Key? key, required this.driveId}) : super(key: key);
+
+  @override
+  _ManageReservationsPageState createState() => _ManageReservationsPageState();
+}
+
+class _ManageReservationsPageState extends State<ManageReservationsPage> {
+  final DriverService _driverService = DriverService();
+  List<dynamic> _reservations = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchReservations();
+  }
+
+  /// Fetch reservations for the current drive
+  Future<void> _fetchReservations() async {
+    try {
+      List<dynamic> reservations = await _driverService.getReservations(widget.driveId);
+      setState(() {
+        _reservations = reservations;
+        _isLoading = false;
+      });
+    } catch (error) {
+      print('Error fetching reservations: $error');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// Update reservation status (accept or refuse)
+  Future<void> _updateReservationStatus(int reservationId, String action) async {
+    try {
+      await _driverService.updateReservationStatus(reservationId, action);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Reservation $action successfully.')),
+      );
+      _fetchReservations(); // Refresh the list after updating
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $error')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Manage Reservations'),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: _reservations.length,
+              itemBuilder: (context, index) {
+                final reservation = _reservations[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: ListTile(
+                    title: Text('Passenger: ${reservation['user']['name']}'),
+                    subtitle: Text(
+                        'Seats: ${reservation['seats']} | Status: ${reservation['status']}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.check, color: Colors.green),
+                          onPressed: () =>
+                              _updateReservationStatus(reservation['id'], 'accept'),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          onPressed: () =>
+                              _updateReservationStatus(reservation['id'], 'refuse'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
